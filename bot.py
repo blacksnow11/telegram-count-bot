@@ -1,17 +1,27 @@
 import asyncio
+import os
 from datetime import datetime, timedelta
+
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from telegram.error import TelegramError
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# 🔐 Paste your bot token here
-BOT_TOKEN = "7895003356:AAHhgFRQ6tEW0_G3g_ZTnyZCVuvloDf4V6g"
+# Configuration is read from environment variables for deployment platforms (Railway, etc.)
+# Required: BOT_TOKEN
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("Missing BOT_TOKEN environment variable")
 
-# 📢 Channel username
-CHANNEL_USERNAME = "@certified_escrow"
+# Optional
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@certified_escrow")
 
-# 🔒 Only authorized users
-AUTHORIZED_USERS = {8182255472}
+# Comma-separated user IDs, e.g. "123,456"
+_default_authorized = {8182255472}
+_authorized_env = os.getenv("AUTHORIZED_USERS")
+if _authorized_env:
+    AUTHORIZED_USERS = {int(x.strip()) for x in _authorized_env.split(",") if x.strip()}
+else:
+    AUTHORIZED_USERS = _default_authorized
 
 async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -109,10 +119,14 @@ async def safe_reply(update: Update, text: str):
     except Exception:
         pass
 
-async def main():
+def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("countdown", countdown))
-    await app.run_polling()
+
+    # NOTE: python-telegram-bot's run_polling() manages its own event loop.
+    # Do not wrap it in asyncio.run() or await it.
+    app.run_polling()
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
