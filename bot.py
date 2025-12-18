@@ -7,12 +7,26 @@ from telegram.ext import (
     ContextTypes
 )
 
-# 🔐 PUT YOUR *NEW* TOKEN HERE (do NOT share it)
+# 🔐 HARD-CODED BOT TOKEN (paste your real token here locally)
 BOT_TOKEN = "7895003356:AAHhgFRQ6tEW0_G3g_ZTnyZCVuvloDf4V6g"
 
-CHANNEL_USERNAME = "@xgensuite"
+# 📢 Channel username
+CHANNEL_USERNAME = "@certified_escrow"
+
+# 🔒 Only YOU are allowed to use the bot
+AUTHORIZED_USERS = {8182255472}
 
 async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # 🔐 Authorization check
+    user_id = update.effective_user.id
+    if user_id not in AUTHORIZED_USERS:
+        await update.message.reply_text("🚫 You are not authorized to use this bot.")
+        return
+
+    # Only accept private messages
+    if update.effective_chat.type != "private":
+        return
+
     if len(context.args) < 2:
         await update.message.reply_text(
             "Usage:\n/countdown HH:MM Your message text"
@@ -30,7 +44,7 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     end_time = datetime.utcnow() + timedelta(hours=hours, minutes=minutes)
 
-    # Initial post
+    # Initial message to channel
     sent = await context.bot.send_message(
         chat_id=CHANNEL_USERNAME,
         text=f"{base_text}\n\n⏳ Time left: {hours:02d}:{minutes:02d}"
@@ -38,6 +52,7 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message_id = sent.message_id
 
+    # Countdown loop (updates every minute)
     while True:
         await asyncio.sleep(60)
 
@@ -57,16 +72,16 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text=f"{base_text}\n\n⏳ Time left: {h:02d}:{m:02d}"
             )
         except:
-            pass
+            pass  # message deleted or edit failed
 
-    # Final edit of original message
+    # Final edit of the original countdown message
     await context.bot.edit_message_text(
         chat_id=CHANNEL_USERNAME,
         message_id=message_id,
         text="⛔ Discount expired"
     )
 
-    # NEW message after expiration
+    # Send a NEW message announcing expiration
     await context.bot.send_message(
         chat_id=CHANNEL_USERNAME,
         text=f"🚫 {base_text} has officially expired."
