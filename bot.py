@@ -6,16 +6,13 @@ from telegram import Update
 from telegram.error import TelegramError
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# Configuration is read from environment variables for deployment platforms (Railway, etc.)
-# Required: BOT_TOKEN
+# Configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("Missing BOT_TOKEN environment variable")
 
-# Optional
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@certified_escrow")
 
-# Comma-separated user IDs, e.g. "123,456"
 _default_authorized = {8182255472}
 _authorized_env = os.getenv("AUTHORIZED_USERS")
 if _authorized_env:
@@ -23,20 +20,34 @@ if _authorized_env:
 else:
     AUTHORIZED_USERS = _default_authorized
 
+
+def format_time(seconds: int) -> str:
+    """Format seconds into compact time like '2h 5m 10s', hiding zero values."""
+    h, remainder = divmod(seconds, 3600)
+    m, s = divmod(remainder, 60)
+
+    parts = []
+    if h > 0:
+        parts.append(f"{h}h")
+    if m > 0:
+        parts.append(f"{m}m")
+    if s > 0 or not parts:
+        parts.append(f"{s}s")
+
+    return " ".join(parts)
+
+
 async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    # Authorization check
     if user_id not in AUTHORIZED_USERS:
         await safe_reply(update, "🚫 You are not authorized to use this bot.")
         return
 
-    # Must be private chat
     if update.effective_chat.type != "private":
         await safe_reply(update, "⚠️ Please use this command in a private chat with the bot.")
         return
 
-    # Validate command arguments
     if len(context.args) < 2:
         await safe_reply(update, "Usage:\n/countdown HH:MM Your message text")
         return
@@ -49,52 +60,49 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if hours < 0 or minutes < 0 or minutes >= 60:
             raise ValueError
     except ValueError:
-        await safe_reply(update, "❌ Invalid time format. Use HH:MM with valid numbers.")
+        await safe_reply(update, "❌ Invalid time format. Use HH:MM.")
         return
 
     end_time = datetime.utcnow() + timedelta(hours=hours, minutes=minutes)
+    total_seconds = hours * 3600 + minutes * 60
 
-    # Send initial message to channel
+    # Initial message
     try:
         sent_message = await context.bot.send_message(
             chat_id=CHANNEL_USERNAME,
-            text=f"{base_text}\n\n⏳ Time left: {hours:02d}:{minutes:02d}:00"
+            text=f"{base_text}\n\n⏳ Time left: {format_time(total_seconds)}"
         )
         message_id = sent_message.message_id
     except TelegramError as e:
-        await safe_reply(update, f"❌ Failed to send message to the channel: {e}")
+        await safe_reply(update, f"❌ Failed to send message: {e}")
         return
 
-    # Countdown loop
+    # Countdown loop (update every 5 seconds)
     try:
         while True:
             remaining = end_time - datetime.utcnow()
-            total_seconds = int(remaining.total_seconds())
+            seconds_left = int(remaining.total_seconds())
 
-            if total_seconds <= 0:
+            if seconds_left <= 0:
                 break
-
-            h, remainder = divmod(total_seconds, 3600)
-            m, s = divmod(remainder, 60)
 
             try:
                 await context.bot.edit_message_text(
                     chat_id=CHANNEL_USERNAME,
                     message_id=message_id,
-                    text=f"{base_text}\n\n⏳ Time left: {h:02d}:{m:02d}:{s:02d}"
+                    text=f"{base_text}\n\n⏳ Time left: {format_time(seconds_left)}"
                 )
             except TelegramError:
-                pass  # Message could be deleted or edit failed
+                pass
 
-            # Sleep 1 second for accurate countdown
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
+
     except asyncio.CancelledError:
-        return  # Graceful exit if bot is stopped
+        return
     except Exception as e:
-        # Catch-all to prevent crash
-        print(f"Unexpected error in countdown: {e}")
+        print(f"Countdown error: {e}")
 
-    # Final messages after countdown ends
+    # Expired messages
     try:
         await context.bot.edit_message_text(
             chat_id=CHANNEL_USERNAME,
@@ -112,19 +120,17 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except TelegramError:
         pass
 
+
 async def safe_reply(update: Update, text: str):
-    """Send a reply safely without crashing."""
     try:
         await update.message.reply_text(text)
     except Exception:
         pass
 
+
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("countdown", countdown))
-
-    # NOTE: python-telegram-bot's run_polling() manages its own event loop.
-    # Do not wrap it in asyncio.run() or await it.
     app.run_polling()
 
 
