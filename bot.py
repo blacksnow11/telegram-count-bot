@@ -11,7 +11,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("Missing BOT_TOKEN environment variable")
 
-CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@xgensuite")
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@certified_escrow")
 
 _default_authorized = {8182255472}
 _authorized_env = os.getenv("AUTHORIZED_USERS")
