@@ -102,12 +102,12 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Countdown error: {e}")
 
-    # Expired messages
+    # Expired messages (FIXED)
     try:
         await context.bot.edit_message_text(
             chat_id=CHANNEL_USERNAME,
             message_id=message_id,
-            text="⛔ Discount expired"
+            text="⛔ This discount has expired."
         )
     except TelegramError:
         pass
@@ -115,7 +115,7 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await context.bot.send_message(
             chat_id=CHANNEL_USERNAME,
-            text=f"🚫 {base_text} has officially expired."
+            text="🚫 The discount has officially expired."
         )
     except TelegramError:
         pass
