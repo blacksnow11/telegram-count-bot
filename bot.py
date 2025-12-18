@@ -23,6 +23,8 @@ else:
 
 def format_time(seconds: int) -> str:
     """Format seconds into compact time like '2h 5m 10s', hiding zero values."""
+    seconds = max(0, seconds)
+
     h, remainder = divmod(seconds, 3600)
     m, s = divmod(remainder, 60)
 
@@ -83,7 +85,7 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
             remaining = end_time - datetime.utcnow()
             seconds_left = int(remaining.total_seconds())
 
-            if seconds_left <= 0:
+            if seconds_left < 0:
                 break
 
             try:
@@ -102,16 +104,7 @@ async def countdown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Countdown error: {e}")
 
-    # Expired messages (FIXED)
-    try:
-        await context.bot.edit_message_text(
-            chat_id=CHANNEL_USERNAME,
-            message_id=message_id,
-            text="⛔ This discount has expired."
-        )
-    except TelegramError:
-        pass
-
+    # Expiration announcement (separate message)
     try:
         await context.bot.send_message(
             chat_id=CHANNEL_USERNAME,
